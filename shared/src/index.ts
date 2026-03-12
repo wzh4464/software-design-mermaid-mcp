@@ -1,2 +1,3 @@
 export * from "./types.js";
-// Parser and serializer exports added in Tasks 3 and 4
+export { parseMermaid } from "./parser.js";
+// Serializer export added in Task 4
