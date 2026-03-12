@@ -49,13 +49,16 @@ function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): Fl
     shape: (n.data as { shape: string }).shape as FlowNode["shape"],
     position: n.position,
   }));
-  const flowEdges: FlowEdge[] = edges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    label: e.label as string | undefined,
-    type: ((e.data as { edgeType?: string })?.edgeType as FlowEdge["type"]) || "arrow",
-  }));
+  const flowEdges: FlowEdge[] = edges.map((e) => {
+    const data = e.data as { edgeType?: string; __updatedLabel?: string } | undefined;
+    return {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      label: data?.__updatedLabel ?? (e.label as string | undefined),
+      type: (data?.edgeType as FlowEdge["type"]) || "arrow",
+    };
+  });
   return { direction, nodes: flowNodes, edges: flowEdges };
 }
 
@@ -65,6 +68,7 @@ function EditorInner() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [title, setTitle] = useState("Software Design");
+  const [description, setDescription] = useState<string | null>(null);
   const [direction, setDirection] = useState<Direction>("TD");
   const [version, setVersion] = useState(0);
   const [connected, setConnected] = useState(false);
@@ -97,6 +101,7 @@ function EditorInner() {
             setVersion(data.version);
             versionRef.current = data.version;
             if (data.title) setTitle(data.title);
+            setDescription(data.description || null);
             baselineRef.current = { nodes: newNodes, edges: newEdges };
             resetHistory(); // Reset undo/redo on new diagram from Claude
             setSubmitStatus("idle");
@@ -184,7 +189,10 @@ function EditorInner() {
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Title Bar */}
       <div style={{ padding: "8px 16px", background: "rgba(99,102,241,0.15)", borderBottom: "1px solid rgba(255,255,255,0.1)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: "#818cf8", fontWeight: 600 }}>{title}</span>
+        <div>
+          <span style={{ color: "#818cf8", fontWeight: 600 }}>{title}</span>
+          {description && <span style={{ color: "#94a3b8", fontSize: "0.75rem", marginLeft: 12 }}>{description}</span>}
+        </div>
         <span style={{ fontSize: "0.75rem", color: connected ? "#34d399" : "#ef4444" }}>
           {sessionEnded ? "Session Ended" : connected ? "Connected" : "Disconnected"}
         </span>
