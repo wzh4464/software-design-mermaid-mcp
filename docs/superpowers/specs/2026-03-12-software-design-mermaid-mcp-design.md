@@ -46,9 +46,11 @@ An MCP server that provides a visual drag-and-drop flowchart editor during Claud
 - Dynamic port (auto-assigned, avoids conflicts)
 - Serves the pre-built React Flow editor as static files from `dist/editor/`
 - REST API endpoints:
-  - `GET /api/diagram` — returns current diagram state + version counter
-  - `POST /api/diagram` — receives user's edited diagram
-  - `GET /api/status` — health check
+  - `GET /api/diagram` — returns current diagram state + version counter (editor polls this)
+  - `POST /api/submission` — receives user's edited diagram submission
+  - `GET /api/status` — health check + connection tracking (editor considered connected if polled within last 5s)
+
+**CORS:** Not needed in production — the editor is served as static files from the same origin. During development (Vite dev server on a different port), the HTTP server enables CORS for `localhost:*`.
 
 ### 3. Web Editor (`editor/`)
 
@@ -56,9 +58,11 @@ An MCP server that provides a visual drag-and-drop flowchart editor during Claud
 - Pre-built and committed to `dist/editor/` (no build step needed at runtime)
 - Polls `GET /api/diagram` every 2s for Claude's updates (version-gated)
 
-### 4. Mermaid Converter (`src/converter/`)
+### 4. Mermaid Converter (`shared/converter/`)
 
-- Shared module used by both server and editor
+- Lives in `shared/converter/` as a workspace package (`@software-design-mermaid-mcp/converter`)
+- Consumed by both the MCP server and the editor via npm workspaces
+- The monorepo uses npm workspaces with three packages: `server` (root), `editor/`, and `shared/`
 - `parseMermaid(code: string): FlowDiagram` — Mermaid flowchart → internal model
 - `toMermaid(diagram: FlowDiagram): string` — internal model → Mermaid code
 
@@ -77,12 +81,13 @@ An MCP server that provides a visual drag-and-drop flowchart editor during Claud
 // Output
 {
   success: true;
-  url: string;             // e.g. "http://localhost:54321"
+  url: string;              // e.g. "http://localhost:54321"
+  editor_connected: boolean; // false on first call (browser not yet open), true on subsequent calls if editor is polling
   message: "Diagram opened in browser. Call get_diagram_feedback() to get user's changes.";
 }
 ```
 
-**Behavior:** First call opens browser automatically. Subsequent calls update the diagram in-place (editor detects via version counter on its polling endpoint).
+**Behavior:** First call opens browser automatically. Subsequent calls update the diagram in-place (editor detects via version counter on its polling endpoint). If a previous session has pending (unread) user feedback, it is discarded and replaced by the new diagram. Only one diagram session is active at a time (single-session model for MVP).
 
 ### `get_diagram_feedback`
 
@@ -117,10 +122,18 @@ An MCP server that provides a visual drag-and-drop flowchart editor during Claud
 // Output
 {
   success: true;
-  final_mermaid: string;
+  final_mermaid: string;    // last submitted version, or original if never submitted
   message: "Editor closed.";
 }
+
+// Output (no active session)
+{
+  success: false;
+  message: "No active diagram session.";
+}
 ```
+
+**Behavior:** Returns the last submitted Mermaid code. If the user never submitted, returns the original diagram from the last `show_diagram()` call. The browser is notified via the next poll and shows a "Session ended" message. The HTTP server shuts down.
 
 ## Internal Data Model
 
@@ -144,9 +157,10 @@ interface FlowDiagram {
   direction: "TD" | "LR" | "BT" | "RL";
   nodes: FlowNode[];
   edges: FlowEdge[];
-  subgraphs?: Subgraph[];
+  subgraphs?: Subgraph[];  // post-MVP: not supported in editor UI for v1
 }
 
+// Post-MVP: parser recognizes subgraphs but editor renders them as flat nodes in v1
 interface Subgraph {
   id: string;
   label: string;
@@ -211,14 +225,14 @@ interface Subgraph {
 - Select + Delete key → remove node/edge
 - Scroll → zoom in/out
 - Drag canvas → pan
-- Ctrl+Z / Ctrl+Y → undo / redo
+- Ctrl+Z / Ctrl+Y → undo / redo (local to current editing session; reset when Claude sends a new diagram; lost on page refresh)
 
 **Submit flow:**
 1. User edits diagram
 2. (Optional) types a message for Claude
 3. Clicks "Submit to Claude"
 4. Editor serializes graph → Mermaid code
-5. `POST /api/diagram` to server
+5. `POST /api/submission` to server
 6. Button shows "Submitted — Waiting for Claude..."
 7. Editor polls `GET /api/diagram` for Claude's next update
 8. "Reset" reverts to last Claude-sent version
@@ -235,7 +249,7 @@ interface Subgraph {
 Round 1:
   Claude → show_diagram(mermaid) → MCP Server → opens browser → Web Editor
   User drags, edits, connects...
-  Web Editor → POST /api/diagram → MCP Server (stores pending feedback)
+  Web Editor → POST /api/submission → MCP Server (stores pending feedback)
   Claude → get_diagram_feedback() → MCP Server → returns updated mermaid
 
 Round 2:
@@ -247,27 +261,53 @@ End:
   Claude → close_diagram() → MCP Server → returns final mermaid, shuts down HTTP server
 ```
 
+## State Management
+
+### Session Lifecycle
+
+- Only **one diagram session** is active at a time (single-session model for MVP)
+- `show_diagram()` creates or replaces the current session. Any pending user feedback from the previous session is discarded.
+- The `version` counter starts at 1 and increments each time Claude calls `show_diagram()`.
+- `get_diagram_feedback()` returns `"pending"` if no submission exists, or `"submitted"` with the user's changes. After being read, the submission is cleared (one-shot read).
+- `close_diagram()` returns the last submitted Mermaid code (or the original if user never submitted). If no session is active, returns an error.
+
+### Changes Summary Computation
+
+- The **server** computes `changes_summary` by diffing the user's submitted graph against the last diagram Claude sent via `show_diagram()`.
+- Diff is computed by **node `id`** and **edge `id`** comparison. Node identity is the `id` string, not the label.
+- This baseline is always the most recent `show_diagram()` input.
+
+### Connection Tracking
+
+- The server tracks the timestamp of the editor's last `GET /api/diagram` poll.
+- The editor is considered **connected** if it polled within the last 5 seconds.
+- The `show_diagram()` tool response includes `editor_connected: boolean`.
+
 ## Editor ↔ Server Communication
 
-- **Editor → Server:** `POST /api/diagram` with `{ nodes, edges, mermaid_code, user_message? }`
+- **Editor → Server:** `POST /api/submission` with `{ nodes, edges, mermaid_code, user_message? }`
 - **Server → Editor:** `GET /api/diagram` polled every 2s, response includes `version` counter
 - Editor only updates canvas when `version` increments (i.e., Claude sent a new diagram)
+- Claude's diagram updates flow through in-memory state (MCP server writes directly to state, not via HTTP API)
 
 ## Project Structure
 
 ```
 software-design-mermaid-mcp/
-├── package.json              # MCP server entry + scripts
+├── package.json              # Root: npm workspaces, MCP server entry + scripts
 ├── tsconfig.json
-├── src/
+├── src/                      # MCP server source
 │   ├── index.ts              # MCP server entry (stdio)
 │   ├── server.ts             # HTTP server (serves editor + REST API)
 │   ├── tools.ts              # MCP tool definitions
-│   ├── state.ts              # Diagram state management
+│   └── state.ts              # Diagram state management
+├── shared/                   # Shared workspace package (@software-design-mermaid-mcp/converter)
+│   ├── package.json
 │   └── converter/
 │       ├── parser.ts         # Mermaid code → nodes/edges
-│       └── serializer.ts     # nodes/edges → Mermaid code
-├── editor/                   # React Flow editor (Vite project)
+│       ├── serializer.ts     # nodes/edges → Mermaid code
+│       └── types.ts          # FlowNode, FlowEdge, FlowDiagram interfaces
+├── editor/                   # React Flow editor (Vite project, workspace package)
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── index.html
@@ -281,6 +321,8 @@ software-design-mermaid-mcp/
 └── dist/                     # Pre-built editor (committed to repo)
     └── editor/               # Static files served by HTTP server
 ```
+
+**Note:** Build artifacts in `dist/` are committed for zero-build-step runtime. A `postinstall` script (`npm run build:editor`) is provided as an alternative. Add `.gitattributes` with `dist/ linguist-generated=true` to keep diffs clean.
 
 ## Installation
 
