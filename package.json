@@ -7,11 +7,15 @@
     "shared",
     "editor"
   ],
+  "bin": {
+    "software-design-mermaid-mcp": "./dist/server/index.js"
+  },
   "scripts": {
     "build": "npm run build:shared && npm run build:server && npm run build:editor",
     "build:shared": "cd shared && tsc",
     "build:server": "tsc -p tsconfig.json",
     "build:editor": "cd editor && npm run build",
+    "start": "node dist/server/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:editor": "cd editor && npm run dev"
