@@ -1,77 +1,108 @@
 # Software Design Mermaid MCP
 
-An MCP (Model Context Protocol) server that enables AI assistants to display Mermaid flowchart diagrams in an interactive, browser-based drag-and-drop editor. When the AI calls `show_diagram`, a local HTTP server launches and opens a React Flow editor in the browser where the user can visually rearrange nodes, edit labels, change shapes, add or remove elements, and submit their changes back to the AI.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Installation
+An MCP server that brings **interactive visual diagram editing** to Claude Code. When Claude generates a Mermaid flowchart, it opens a browser-based drag-and-drop editor where you can rearrange nodes, edit labels, add/remove elements, and submit changes back — enabling multi-round visual collaboration.
+
+## Features
+
+- **Drag-and-drop editor** — Full React Flow canvas with zoom, pan, minimap, and grid snapping
+- **5 node shapes** — Rectangle, rounded, diamond, circle, stadium — each with distinct colors
+- **3 edge types** — Arrow, dotted, thick — with inline label editing
+- **Live Mermaid preview** — See the Mermaid code update as you edit
+- **Multi-round iteration** — Submit edits to Claude, get an updated diagram, repeat
+- **Undo/redo** — Ctrl+Z / Ctrl+Y with full history
+- **Zero config** — Starts a local HTTP server on a random port, opens browser automatically
+
+## Quick Start
+
+### Claude Code
 
 ```bash
-git clone https://github.com/anthropics/software-design-mermaid-mcp.git
+# Clone and build
+git clone https://github.com/wzh4464/software-design-mermaid-mcp.git
 cd software-design-mermaid-mcp
-npm install
-npm run build
+npm install && npm run build
+
+# Register with Claude Code
+claude mcp add software-design-mermaid node $(pwd)/dist/server/index.js
 ```
 
-## Usage with Claude Code
+### VS Code with Claude Extension
 
-Register the MCP server with Claude Code:
+Add to your VS Code settings JSON:
 
-```bash
-claude mcp add software-design-mermaid node /absolute/path/to/software-design-mermaid-mcp/dist/server/index.js
+```json
+{
+  "claude.mcpServers": {
+    "software-design-mermaid": {
+      "command": "node",
+      "args": ["/absolute/path/to/software-design-mermaid-mcp/dist/server/index.js"]
+    }
+  }
+}
 ```
 
-Or run directly:
+### Claude Desktop
 
-```bash
-node dist/server/index.js
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "software-design-mermaid": {
+      "command": "node",
+      "args": ["/absolute/path/to/software-design-mermaid-mcp/dist/server/index.js"]
+    }
+  }
+}
 ```
 
 ## Available Tools
 
-### `show_diagram`
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `show_diagram` | Display a Mermaid flowchart in the visual editor. Opens the browser automatically. | `mermaid_code` (required), `title`, `description` |
+| `get_diagram_feedback` | Poll for user's edits. Returns `submitted` with updated Mermaid code and changes summary, or `pending`. One-shot read semantics. | None |
+| `close_diagram` | Close the editor session. Returns final Mermaid code. | None |
 
-Display a Mermaid flowchart in a visual drag-and-drop editor. Opens a browser-based editor where the user can visually edit the diagram. Call `get_diagram_feedback()` afterwards to retrieve the user's changes.
+## How It Works
 
-**Parameters:**
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `mermaid_code` | string | Yes | Mermaid flowchart code (e.g., `graph TD\n  A[Start] --> B[End]`) |
-| `title` | string | No | Title shown in the editor header |
-| `description` | string | No | Context description shown to the user |
-
-### `get_diagram_feedback`
-
-Poll for user's diagram edits. Returns `submitted` with updated Mermaid code and a changes summary if the user has submitted, or `pending` if they are still editing. Submission is one-shot: cleared after reading.
-
-**Parameters:** None
-
-### `close_diagram`
-
-Close the diagram editor session. Returns the final Mermaid code (last submitted version, or original if never submitted). Shuts down the local HTTP server.
-
-**Parameters:** None
+```
+Claude                    MCP Server                 Browser Editor
+  │                          │                            │
+  │── show_diagram() ───────>│                            │
+  │                          │── starts HTTP server ─────>│
+  │                          │── opens browser ──────────>│
+  │<── { url, success } ─────│                            │
+  │                          │<── polls /api/diagram ─────│
+  │                          │── returns mermaid code ───>│
+  │                          │                            │ user edits...
+  │                          │<── POST /api/submission ───│
+  │── get_diagram_feedback()>│                            │
+  │<── { mermaid, changes } ─│                            │
+  │                          │                            │
+  │── show_diagram() ───────>│  (iterate with new code)   │
+  │   ...repeat...           │                            │
+```
 
 ## Architecture
 
-This is a TypeScript monorepo with npm workspaces:
+TypeScript monorepo with npm workspaces:
 
-- **`shared/`** -- Mermaid flowchart parser and serializer (converts between Mermaid code and a structured node/edge graph)
-- **`src/`** -- MCP server with stdio transport, HTTP server for the editor, and diagram state management
-- **`editor/`** -- React Flow-based visual diagram editor (pre-built output in `dist/editor/`)
+- **`shared/`** — Mermaid parser & serializer (bidirectional `FlowDiagram` ↔ Mermaid code)
+- **`src/`** — MCP server (stdio), HTTP server (REST API), diagram state management
+- **`editor/`** — React Flow visual editor (pre-built in `dist/editor/`)
 
 ## Development
 
 ```bash
-# Run tests
-npm test
-
-# Build all workspaces
-npm run build
-
-# Dev mode for editor (with hot reload)
-npm run dev:editor
+npm install          # Install all workspace dependencies
+npm test             # Run all tests (42 tests across 4 suites)
+npm run build        # Build shared → server → editor
+npm run dev:editor   # Editor dev mode with hot reload
 ```
 
 ## License
 
-MIT
+[MIT](LICENSE)

@@ -1,16 +1,41 @@
 {
   "name": "software-design-mermaid-mcp",
   "version": "0.1.0",
-  "private": true,
+  "description": "MCP server for interactive visual Mermaid diagram editing in Claude Code",
   "type": "module",
+  "license": "MIT",
+  "author": "wzh4464",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wzh4464/software-design-mermaid-mcp.git"
+  },
+  "homepage": "https://github.com/wzh4464/software-design-mermaid-mcp",
+  "bugs": {
+    "url": "https://github.com/wzh4464/software-design-mermaid-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "mermaid",
+    "diagram",
+    "flowchart",
+    "visual-editor",
+    "claude-code",
+    "model-context-protocol",
+    "software-design"
+  ],
   "workspaces": [
     "shared",
     "editor"
+  ],
+  "files": [
+    "dist"
   ],
   "bin": {
     "software-design-mermaid-mcp": "./dist/server/index.js"
   },
   "scripts": {
+    "prepublishOnly": "npm run build",
     "build": "npm run build:shared && npm run build:server && npm run build:editor",
     "build:shared": "cd shared && tsc",
     "build:server": "tsc -p tsconfig.json",
