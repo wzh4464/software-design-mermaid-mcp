@@ -23,9 +23,36 @@ export function toMermaid(diagram: FlowDiagram): string {
   const lines: string[] = [];
   lines.push(`graph ${diagram.direction}`);
 
-  // Emit all nodes as explicit declarations
+  // Build set of nodes that belong to subgraphs
+  const nodesInSubgraphs = new Set<string>();
+  if (diagram.subgraphs) {
+    for (const sg of diagram.subgraphs) {
+      for (const nodeId of sg.nodeIds) {
+        nodesInSubgraphs.add(nodeId);
+      }
+    }
+  }
+
+  // Emit top-level nodes (not in any subgraph)
   for (const node of diagram.nodes) {
-    lines.push(`  ${serializeNode(node)}`);
+    if (!nodesInSubgraphs.has(node.id)) {
+      lines.push(`  ${serializeNode(node)}`);
+    }
+  }
+
+  // Emit subgraph blocks with their nodes
+  if (diagram.subgraphs) {
+    const nodeById = new Map(diagram.nodes.map((n) => [n.id, n]));
+    for (const sg of diagram.subgraphs) {
+      lines.push(`  subgraph ${sg.id} [${sg.label}]`);
+      for (const nodeId of sg.nodeIds) {
+        const node = nodeById.get(nodeId);
+        if (node) {
+          lines.push(`    ${serializeNode(node)}`);
+        }
+      }
+      lines.push(`  end`);
+    }
   }
 
   // Emit all edges with bare IDs (nodes already declared above)
