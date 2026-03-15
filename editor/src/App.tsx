@@ -45,7 +45,13 @@ function flowToReactFlow(diagram: FlowDiagram, direction: Direction): { nodes: N
   return { nodes: laidOutNodes, edges };
 }
 
-/** Three-pass approach: collect subgraphGroup nodes, attach regular children, then nest subgraphs. */
+/**
+ * Three-pass approach: collect subgraphGroup nodes, attach regular children, then nest subgraphs.
+ *
+ * NOTE: The nesting semantics here (parentId → children) must stay aligned with the
+ * parser's Subgraph.children structure so that round-tripping through parseMermaid →
+ * editor → toMermaid produces consistent results.
+ */
 function buildSubgraphsFromNodes(nodes: Node[]): Map<string, Subgraph> {
   const subgraphMap = new Map<string, Subgraph>();
   // Pass 1: collect all subgraphGroup nodes

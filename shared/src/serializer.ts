@@ -29,25 +29,39 @@ function serializeSubgraphHeader(sg: Subgraph): string {
   return `subgraph ${sg.id} [${sg.label}]`;
 }
 
-function collectAllSubgraphNodeIds(subgraphs: Subgraph[], acc: Set<string> = new Set<string>()): Set<string> {
+function collectAllSubgraphNodeIds(
+  subgraphs: Subgraph[],
+  acc: Set<string> = new Set<string>(),
+  visited: Set<string> = new Set<string>(),
+): Set<string> {
   for (const sg of subgraphs) {
+    if (visited.has(sg.id)) continue;
+    visited.add(sg.id);
     for (const nodeId of sg.nodeIds) {
       acc.add(nodeId);
     }
     if (sg.children) {
-      collectAllSubgraphNodeIds(sg.children, acc);
+      collectAllSubgraphNodeIds(sg.children, acc, visited);
     }
   }
   return acc;
 }
 
-function emitSubgraph(sg: Subgraph, nodeById: Map<string, FlowNode>, lines: string[], indent: string): void {
+function emitSubgraph(
+  sg: Subgraph,
+  nodeById: Map<string, FlowNode>,
+  lines: string[],
+  indent: string,
+  visited: Set<string> = new Set<string>(),
+): void {
+  if (visited.has(sg.id)) return;
+  visited.add(sg.id);
   lines.push(`${indent}${serializeSubgraphHeader(sg)}`);
   const childIndent = indent + "  ";
   // Emit child subgraphs first
   if (sg.children) {
     for (const child of sg.children) {
-      emitSubgraph(child, nodeById, lines, childIndent);
+      emitSubgraph(child, nodeById, lines, childIndent, visited);
     }
   }
   // Then emit direct nodes
