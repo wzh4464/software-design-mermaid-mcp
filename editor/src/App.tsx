@@ -45,7 +45,7 @@ function flowToReactFlow(diagram: FlowDiagram, direction: Direction): { nodes: N
   return { nodes: laidOutNodes, edges };
 }
 
-/** Two-pass approach: first collect subgraphGroup nodes, then attach children by parentId. */
+/** Three-pass approach: collect subgraphGroup nodes, attach regular children, then nest subgraphs. */
 function buildSubgraphsFromNodes(nodes: Node[]): Map<string, Subgraph> {
   const subgraphMap = new Map<string, Subgraph>();
   // Pass 1: collect all subgraphGroup nodes
@@ -59,10 +59,20 @@ function buildSubgraphsFromNodes(nodes: Node[]): Map<string, Subgraph> {
       });
     }
   }
-  // Pass 2: attach children by parentId
+  // Pass 2: attach non-subgraphGroup children by parentId
   for (const n of nodes) {
     if (n.type !== "subgraphGroup" && n.parentId && subgraphMap.has(n.parentId)) {
       subgraphMap.get(n.parentId)!.nodeIds.push(n.id);
+    }
+  }
+  // Pass 3: nest subgraphGroup nodes that have a parentId pointing to another subgraphGroup
+  for (const n of nodes) {
+    if (n.type === "subgraphGroup" && n.parentId && subgraphMap.has(n.parentId)) {
+      const child = subgraphMap.get(n.id)!;
+      const parent = subgraphMap.get(n.parentId)!;
+      if (!parent.children) parent.children = [];
+      parent.children.push(child);
+      subgraphMap.delete(n.id);
     }
   }
   return subgraphMap;

@@ -159,6 +159,7 @@ describe("parseMermaid", () => {
     const result = parseMermaid(input);
     const endNode = result.nodes.find((n) => n.id === "end");
     expect(endNode).toBeUndefined();
+    expect(result.subgraphs ?? []).toHaveLength(0);
   });
 
   it("preserves empty subgraphs", () => {
