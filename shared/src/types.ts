@@ -21,6 +21,8 @@ export interface Subgraph {
   id: string;
   label: string;
   nodeIds: string[];
+  children?: Subgraph[];
+  hasExplicitId?: boolean;
 }
 
 export interface FlowDiagram {
