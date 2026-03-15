@@ -203,4 +203,22 @@ describe("parseMermaid", () => {
     const result = parseMermaid("graph TD\n  A[Start] --> B[End]");
     expect(result.subgraphs).toBeUndefined();
   });
+
+  it("parses nested subgraph where inner uses label-only syntax", () => {
+    const input = `graph TD
+subgraph outer [Outer]
+  subgraph Inner Label Only
+    A[Node A]
+  end
+end`;
+    const result = parseMermaid(input);
+    expect(result.subgraphs).toHaveLength(1);
+    const outer = result.subgraphs![0];
+    expect(outer.id).toBe("outer");
+    expect(outer.children).toHaveLength(1);
+    const inner = outer.children![0];
+    expect(inner.hasExplicitId).toBe(false);
+    expect(inner.id).toBe("Inner_Label_Only");
+    expect(inner.label).toBe("Inner Label Only");
+  });
 });

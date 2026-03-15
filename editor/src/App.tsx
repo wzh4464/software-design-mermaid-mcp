@@ -55,6 +55,7 @@ function buildSubgraphsFromNodes(nodes: Node[]): Map<string, Subgraph> {
         id: n.id,
         label: (n.data as { label: string }).label,
         nodeIds: [],
+        hasExplicitId: true,
       });
     }
   }

@@ -225,6 +225,11 @@ describe("toMermaid", () => {
     expect(aIdx).toBeLessThan(innerEnd);
     expect(bIdx).toBeGreaterThan(innerEnd);
     expect(bIdx).toBeLessThan(outerEnd);
+
+    // Member nodes must NOT appear as top-level nodes (before the outer subgraph block)
+    const topLevelLines = lines.filter((_, i) => i < outerStart);
+    expect(topLevelLines.some((l) => l.includes("A[Inner Node]"))).toBe(false);
+    expect(topLevelLines.some((l) => l.includes("B[Outer Node]"))).toBe(false);
   });
 
   it("round-trips subgraphs through parse and serialize", async () => {
