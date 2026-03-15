@@ -1,4 +1,4 @@
-import type { FlowDiagram, FlowNode, FlowEdge, Direction, NodeShape, EdgeType } from "./types.js";
+import type { FlowDiagram, FlowNode, FlowEdge, Subgraph, Direction, NodeShape, EdgeType } from "./types.js";
 
 const DIRECTION_REGEX = /^(?:graph|flowchart)\s+(TD|LR|BT|RL)/;
 
@@ -62,6 +62,8 @@ export function parseMermaid(code: string): FlowDiagram {
   const edges: FlowEdge[] = [];
   let edgeCounter = 0;
   let nodeOrder = 0;
+  const subgraphs: Subgraph[] = [];
+  const subgraphStack: Subgraph[] = [];
 
   function addNode(id: string, label: string, shape: NodeShape): void {
     if (!nodeMap.has(id)) {
@@ -77,6 +79,13 @@ export function parseMermaid(code: string): FlowDiagram {
         existing.shape = shape;
       }
     }
+    // Track node in current subgraph context
+    if (subgraphStack.length > 0) {
+      const current = subgraphStack[subgraphStack.length - 1];
+      if (!current.nodeIds.includes(id)) {
+        current.nodeIds.push(id);
+      }
+    }
   }
 
   for (const line of lines) {
@@ -86,7 +95,28 @@ export function parseMermaid(code: string): FlowDiagram {
       continue;
     }
 
-    if (line.startsWith("subgraph") || line === "end") {
+    // Subgraph parsing
+    if (line === "end" && subgraphStack.length > 0) {
+      const completed = subgraphStack.pop()!;
+      if (completed.nodeIds.length > 0) {
+        subgraphs.push(completed);
+      }
+      continue;
+    }
+
+    const subgraphMatch = line.match(/^subgraph\s+(\S+?)(?:\s*\[(.+?)\])?(?:\s*$)/);
+    if (subgraphMatch) {
+      const id = subgraphMatch[1];
+      const label = subgraphMatch[2] || id;
+      subgraphStack.push({ id, label, nodeIds: [] });
+      continue;
+    }
+    // Also handle: subgraph Label (no brackets, label becomes id)
+    const subgraphLabelOnly = line.match(/^subgraph\s+(.+)$/);
+    if (subgraphLabelOnly && !subgraphMatch) {
+      const label = subgraphLabelOnly[1].trim();
+      const id = label.replace(/\s+/g, "_");
+      subgraphStack.push({ id, label, nodeIds: [] });
       continue;
     }
 
@@ -119,5 +149,5 @@ export function parseMermaid(code: string): FlowDiagram {
     }
   }
 
-  return { direction, nodes: Array.from(nodeMap.values()), edges };
+  return { direction, nodes: Array.from(nodeMap.values()), edges, ...(subgraphs.length > 0 ? { subgraphs } : {}) };
 }

@@ -126,4 +126,42 @@ describe("toMermaid", () => {
     expect(output).toContain("B -->|Yes| C");
     expect(output).toContain("B -->|No| D");
   });
+
+  it("serializes subgraphs", () => {
+    const diagram: FlowDiagram = {
+      direction: "TD",
+      nodes: [
+        { id: "A", label: "Start", shape: "rect", position: { x: 0, y: 0 } },
+        { id: "B", label: "Process", shape: "rect", position: { x: 0, y: 100 } },
+        { id: "C", label: "Outside", shape: "rect", position: { x: 100, y: 0 } },
+      ],
+      edges: [{ id: "e0", source: "A", target: "B", type: "arrow" }],
+      subgraphs: [{ id: "sg1", label: "My Group", nodeIds: ["A", "B"] }],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain("subgraph sg1 [My Group]");
+    expect(output).toContain("end");
+    // C should be a top-level node, not inside the subgraph
+    const lines = output.split("\n");
+    const cLine = lines.find((l) => l.includes("C[Outside]"));
+    const sgLine = lines.findIndex((l) => l.includes("subgraph"));
+    const cIdx = lines.indexOf(cLine!);
+    expect(cIdx).toBeLessThan(sgLine);
+  });
+
+  it("round-trips subgraphs through parse and serialize", async () => {
+    const input = `graph TD
+  subgraph sg1 [My Group]
+    A[Start]
+    B[End]
+  end
+  A --> B`;
+    const { parseMermaid } = await import("../parser.js");
+    const diagram = parseMermaid(input);
+    const output = toMermaid(diagram);
+    expect(output).toContain("subgraph sg1 [My Group]");
+    expect(output).toContain("A[Start]");
+    expect(output).toContain("B[End]");
+    expect(output).toContain("A --> B");
+  });
 });

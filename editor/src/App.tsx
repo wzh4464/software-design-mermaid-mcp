@@ -15,21 +15,22 @@ import {
   ReactFlowProvider,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { parseMermaid, toMermaid, type FlowDiagram, type FlowNode, type FlowEdge } from "@software-design-mermaid-mcp/converter";
+import { parseMermaid, toMermaid, type FlowDiagram, type FlowNode, type FlowEdge, type Subgraph } from "@software-design-mermaid-mcp/converter";
 import { fetchDiagram, submitDiagram } from "./api.js";
 import { nodeTypes } from "./nodes/index.js";
 import { edgeTypes } from "./edges/index.js";
 import Toolbar from "./toolbar/Toolbar.js";
 import MermaidPreview from "./preview/MermaidPreview.js";
 import { useUndoRedo } from "./hooks/useUndoRedo.js";
+import { applyDagreLayout } from "./layout/dagre.js";
 import type { Direction } from "@software-design-mermaid-mcp/converter";
 
-function flowToReactFlow(diagram: FlowDiagram): { nodes: Node[]; edges: Edge[] } {
+function flowToReactFlow(diagram: FlowDiagram, direction: Direction): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = diagram.nodes.map((n) => ({
     id: n.id,
     type: "flowchart",
     position: n.position,
-    data: { label: n.label, shape: n.shape },
+    data: { label: n.label, shape: n.shape, direction },
   }));
   const edges: Edge[] = diagram.edges.map((e) => ({
     id: e.id,
@@ -39,16 +40,36 @@ function flowToReactFlow(diagram: FlowDiagram): { nodes: Node[]; edges: Edge[] }
     type: "flowchart",
     data: { edgeType: e.type },
   }));
-  return { nodes, edges };
+  // Apply dagre layout
+  const laidOutNodes = applyDagreLayout(nodes, edges, direction, diagram.subgraphs);
+  return { nodes: laidOutNodes, edges };
 }
 
 function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): FlowDiagram {
-  const flowNodes: FlowNode[] = nodes.map((n) => ({
-    id: n.id,
-    label: (n.data as { label: string }).label,
-    shape: (n.data as { shape: string }).shape as FlowNode["shape"],
-    position: n.position,
-  }));
+  // Reconstruct subgraphs from parentId relationships
+  const subgraphMap = new Map<string, Subgraph>();
+  const flowNodes: FlowNode[] = [];
+
+  for (const n of nodes) {
+    if (n.type === "subgraphGroup") {
+      subgraphMap.set(n.id, {
+        id: n.id,
+        label: (n.data as { label: string }).label,
+        nodeIds: [],
+      });
+      continue;
+    }
+    flowNodes.push({
+      id: n.id,
+      label: (n.data as { label: string }).label,
+      shape: (n.data as { shape: string }).shape as FlowNode["shape"],
+      position: n.position,
+    });
+    if (n.parentId && subgraphMap.has(n.parentId)) {
+      subgraphMap.get(n.parentId)!.nodeIds.push(n.id);
+    }
+  }
+
   const flowEdges: FlowEdge[] = edges.map((e) => {
     const data = e.data as { edgeType?: string; __updatedLabel?: string } | undefined;
     return {
@@ -59,7 +80,9 @@ function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): Fl
       type: (data?.edgeType as FlowEdge["type"]) || "arrow",
     };
   });
-  return { direction, nodes: flowNodes, edges: flowEdges };
+
+  const subgraphs = Array.from(subgraphMap.values()).filter((sg) => sg.nodeIds.length > 0);
+  return { direction, nodes: flowNodes, edges: flowEdges, ...(subgraphs.length > 0 ? { subgraphs } : {}) };
 }
 
 let edgeIdCounter = 0;
@@ -94,7 +117,7 @@ function EditorInner() {
             setSessionEnded(true);
           } else if (data.version && data.version > versionRef.current && data.mermaid_code) {
             const diagram = parseMermaid(data.mermaid_code);
-            const { nodes: newNodes, edges: newEdges } = flowToReactFlow(diagram);
+            const { nodes: newNodes, edges: newEdges } = flowToReactFlow(diagram, diagram.direction);
             setNodes(newNodes);
             setEdges(newEdges);
             setDirection(diagram.direction);
@@ -116,6 +139,17 @@ function EditorInner() {
     poll();
     return () => { active = false; };
   }, []);
+
+  // Update direction in node data when direction changes
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.type === "flowchart"
+          ? { ...n, data: { ...n.data, direction } }
+          : n
+      )
+    );
+  }, [direction]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -166,6 +200,13 @@ function EditorInner() {
     [nodes, edges, record]
   );
 
+  const handleAutoLayout = useCallback(() => {
+    record(nodes, edges);
+    const regularNodes = nodes.filter((n) => n.type !== "subgraphGroup");
+    const laidOut = applyDagreLayout(regularNodes, edges, direction);
+    setNodes(laidOut);
+  }, [nodes, edges, direction, record]);
+
   const handleSubmit = useCallback(async () => {
     const diagram = reactFlowToFlow(nodes, edges, direction);
     const code = toMermaid(diagram);
@@ -199,7 +240,7 @@ function EditorInner() {
       </div>
 
       {/* Toolbar */}
-      <Toolbar direction={direction} onDirectionChange={setDirection} onTogglePreview={() => setShowPreview((v) => !v)} showPreview={showPreview} onUndo={() => undo(nodes, edges, setNodes, setEdges)} onRedo={() => redo(nodes, edges, setNodes, setEdges)} canUndo={canUndo()} canRedo={canRedo()} />
+      <Toolbar direction={direction} onDirectionChange={setDirection} onTogglePreview={() => setShowPreview((v) => !v)} showPreview={showPreview} onUndo={() => undo(nodes, edges, setNodes, setEdges)} onRedo={() => redo(nodes, edges, setNodes, setEdges)} canUndo={canUndo()} canRedo={canRedo()} onAutoLayout={handleAutoLayout} />
 
       {/* Main Area */}
       <div style={{ flex: 1, display: "flex" }}>

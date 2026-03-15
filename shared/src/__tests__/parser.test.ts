@@ -103,4 +103,64 @@ describe("parseMermaid", () => {
     expect(result.nodes[1].position).toBeDefined();
     expect(result.nodes[0].position.y).not.toBe(result.nodes[1].position.y);
   });
+
+  it("parses subgraph with bracket label", () => {
+    const input = `graph TD
+  subgraph sg1 [My Group]
+    A[Node A]
+    B[Node B]
+  end
+  A --> B`;
+    const result = parseMermaid(input);
+    expect(result.subgraphs).toHaveLength(1);
+    expect(result.subgraphs![0]).toMatchObject({ id: "sg1", label: "My Group" });
+    expect(result.subgraphs![0].nodeIds).toContain("A");
+    expect(result.subgraphs![0].nodeIds).toContain("B");
+    expect(result.nodes).toHaveLength(2);
+    expect(result.edges).toHaveLength(1);
+  });
+
+  it("parses subgraph without bracket label", () => {
+    const input = `graph TD
+  subgraph Feature Engineering
+    A[Alpha158]
+    B[SectorRotation]
+  end`;
+    const result = parseMermaid(input);
+    expect(result.subgraphs).toHaveLength(1);
+    expect(result.subgraphs![0].label).toBe("Feature Engineering");
+    expect(result.subgraphs![0].nodeIds).toEqual(["A", "B"]);
+  });
+
+  it("parses nested subgraphs", () => {
+    const input = `graph TD
+  subgraph outer [Outer]
+    subgraph inner [Inner]
+      A[Node A]
+    end
+    B[Node B]
+  end`;
+    const result = parseMermaid(input);
+    expect(result.subgraphs).toHaveLength(2);
+    const inner = result.subgraphs!.find((sg) => sg.id === "inner");
+    const outer = result.subgraphs!.find((sg) => sg.id === "outer");
+    expect(inner!.nodeIds).toContain("A");
+    expect(outer!.nodeIds).toContain("B");
+  });
+
+  it("tracks nodes from edges inside subgraphs", () => {
+    const input = `graph TD
+  subgraph sg1 [Group]
+    A[Start] --> B[End]
+  end`;
+    const result = parseMermaid(input);
+    expect(result.subgraphs).toHaveLength(1);
+    expect(result.subgraphs![0].nodeIds).toContain("A");
+    expect(result.subgraphs![0].nodeIds).toContain("B");
+  });
+
+  it("returns no subgraphs when none present", () => {
+    const result = parseMermaid("graph TD\n  A[Start] --> B[End]");
+    expect(result.subgraphs).toBeUndefined();
+  });
 });

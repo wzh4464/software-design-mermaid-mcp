@@ -1,9 +1,11 @@
-import { memo, useState, useCallback, type ChangeEvent, type KeyboardEvent } from "react";
+import { memo, useState, useCallback, Fragment, type ChangeEvent, type KeyboardEvent } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import type { Direction } from "@software-design-mermaid-mcp/converter";
 
 export interface FlowchartNodeData {
   label: string;
   shape: "rect" | "rounded" | "diamond" | "circle" | "stadium";
+  direction?: Direction;
   [key: string]: unknown;
 }
 
@@ -23,6 +25,26 @@ const SHAPE_COLORS: Record<string, string> = {
   stadium: "#8b5cf6",
 };
 
+function getHandlePositions(direction?: Direction): { target: Position; source: Position } {
+  switch (direction) {
+    case "LR": return { target: Position.Left, source: Position.Right };
+    case "RL": return { target: Position.Right, source: Position.Left };
+    case "BT": return { target: Position.Bottom, source: Position.Top };
+    default: return { target: Position.Top, source: Position.Bottom };
+  }
+}
+
+function renderLabel(label: string): React.ReactNode {
+  const parts = label.split(/<br\s*\/?>/gi);
+  if (parts.length === 1) return label;
+  return parts.map((part, i) => (
+    <Fragment key={i}>
+      {part}
+      {i < parts.length - 1 && <br />}
+    </Fragment>
+  ));
+}
+
 function FlowchartNode({ data, selected }: NodeProps) {
   const nodeData = data as FlowchartNodeData;
   const [editing, setEditing] = useState(false);
@@ -30,6 +52,7 @@ function FlowchartNode({ data, selected }: NodeProps) {
   const shape = nodeData.shape || "rect";
   const color = SHAPE_COLORS[shape];
   const isDiamond = shape === "diamond";
+  const { target, source } = getHandlePositions(nodeData.direction);
 
   const handleDoubleClick = useCallback(() => setEditing(true), []);
   const handleBlur = useCallback(() => {
@@ -65,7 +88,7 @@ function FlowchartNode({ data, selected }: NodeProps) {
 
   return (
     <div style={outerStyle} onDoubleClick={handleDoubleClick}>
-      <Handle type="target" position={Position.Top} style={{ background: color }} />
+      <Handle type="target" position={target} style={{ background: color }} />
       <div style={textStyle}>
         {editing ? (
           <input
@@ -85,10 +108,12 @@ function FlowchartNode({ data, selected }: NodeProps) {
             }}
           />
         ) : (
-          <span style={{ fontSize: "0.85rem", color: "#e2e8f0", userSelect: "none" }}>{label}</span>
+          <span style={{ fontSize: "0.85rem", color: "#e2e8f0", userSelect: "none", textAlign: "center", lineHeight: 1.4 }}>
+            {renderLabel(label)}
+          </span>
         )}
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ background: color }} />
+      <Handle type="source" position={source} style={{ background: color }} />
     </div>
   );
 }

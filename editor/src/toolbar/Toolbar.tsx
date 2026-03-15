@@ -11,6 +11,7 @@ interface ToolbarProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  onAutoLayout?: () => void;
 }
 
 let nodeIdCounter = 0;
@@ -18,7 +19,7 @@ function nextNodeId(): string {
   return `node_${++nodeIdCounter}`;
 }
 
-export default function Toolbar({ direction, onDirectionChange, onTogglePreview, showPreview, onUndo, onRedo, canUndo, canRedo }: ToolbarProps) {
+export default function Toolbar({ direction, onDirectionChange, onTogglePreview, showPreview, onUndo, onRedo, canUndo, canRedo, onAutoLayout }: ToolbarProps) {
   const { addNodes, getNodes, getEdges, setNodes, setEdges } = useReactFlow();
 
   const addNode = useCallback(
@@ -68,6 +69,8 @@ export default function Toolbar({ direction, onDirectionChange, onTogglePreview,
       {sep}
       <button style={{ ...btnStyle, background: direction === "TD" ? "rgba(99,102,241,0.3)" : undefined }} onClick={() => onDirectionChange("TD")}>TD</button>
       <button style={{ ...btnStyle, background: direction === "LR" ? "rgba(99,102,241,0.3)" : undefined }} onClick={() => onDirectionChange("LR")}>LR</button>
+      {sep}
+      {onAutoLayout && <button style={btnStyle} onClick={onAutoLayout}>Auto Layout</button>}
       <div style={{ flex: 1 }} />
       <button style={{ ...btnStyle, background: showPreview ? "rgba(99,102,241,0.3)" : undefined }} onClick={onTogglePreview}>
         Mermaid {showPreview ? "\u25BE" : "\u25B8"}
