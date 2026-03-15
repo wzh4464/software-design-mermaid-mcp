@@ -45,11 +45,9 @@ function flowToReactFlow(diagram: FlowDiagram, direction: Direction): { nodes: N
   return { nodes: laidOutNodes, edges };
 }
 
-function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): FlowDiagram {
-  // Two-pass approach: first collect all subgraphGroup nodes, then attach children
+/** Two-pass approach: first collect subgraphGroup nodes, then attach children by parentId. */
+function buildSubgraphsFromNodes(nodes: Node[]): Map<string, Subgraph> {
   const subgraphMap = new Map<string, Subgraph>();
-  const flowNodes: FlowNode[] = [];
-
   // Pass 1: collect all subgraphGroup nodes
   for (const n of nodes) {
     if (n.type === "subgraphGroup") {
@@ -60,8 +58,19 @@ function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): Fl
       });
     }
   }
+  // Pass 2: attach children by parentId
+  for (const n of nodes) {
+    if (n.type !== "subgraphGroup" && n.parentId && subgraphMap.has(n.parentId)) {
+      subgraphMap.get(n.parentId)!.nodeIds.push(n.id);
+    }
+  }
+  return subgraphMap;
+}
 
-  // Pass 2: process non-group nodes and attach children by parentId
+function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): FlowDiagram {
+  const subgraphMap = buildSubgraphsFromNodes(nodes);
+  const flowNodes: FlowNode[] = [];
+
   for (const n of nodes) {
     if (n.type === "subgraphGroup") continue;
     flowNodes.push({
@@ -70,9 +79,6 @@ function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): Fl
       shape: (n.data as { shape: string }).shape as FlowNode["shape"],
       position: n.position,
     });
-    if (n.parentId && subgraphMap.has(n.parentId)) {
-      subgraphMap.get(n.parentId)!.nodeIds.push(n.id);
-    }
   }
 
   const flowEdges: FlowEdge[] = edges.map((e) => {
@@ -207,22 +213,7 @@ function EditorInner() {
 
   const handleAutoLayout = useCallback(() => {
     record(nodes, edges);
-    // Reconstruct subgraphs from current node parentId relationships
-    const subgraphMap = new Map<string, Subgraph>();
-    for (const n of nodes) {
-      if (n.type === "subgraphGroup") {
-        subgraphMap.set(n.id, {
-          id: n.id,
-          label: (n.data as { label: string }).label,
-          nodeIds: [],
-        });
-      }
-    }
-    for (const n of nodes) {
-      if (n.type !== "subgraphGroup" && n.parentId && subgraphMap.has(n.parentId)) {
-        subgraphMap.get(n.parentId)!.nodeIds.push(n.id);
-      }
-    }
+    const subgraphMap = buildSubgraphsFromNodes(nodes);
     const subgraphs = Array.from(subgraphMap.values()).filter((sg) => sg.nodeIds.length > 0);
     const regularNodes = nodes.filter((n) => n.type !== "subgraphGroup");
     const laidOut = applyDagreLayout(regularNodes, edges, direction, subgraphs.length > 0 ? subgraphs : undefined);

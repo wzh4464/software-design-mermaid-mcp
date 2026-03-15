@@ -3,6 +3,9 @@ import type { NodeProps } from "@xyflow/react";
 
 function SubgraphNode({ data }: NodeProps) {
   const nodeData = data as { label: string };
+  // Collapsed currently only affects visual styling (opacity, border, background).
+  // Full child hiding would require propagating collapsed state to the graph model
+  // so that child nodes/edges can be removed from the ReactFlow render tree.
   const [collapsed, setCollapsed] = useState(false);
   return (
     <div

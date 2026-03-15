@@ -179,6 +179,20 @@ describe("toMermaid", () => {
     expect(output).not.toContain("[Feature Engineering]");
   });
 
+  it("serializes subgraph with id === label and hasExplicitId without brackets", () => {
+    const diagram: FlowDiagram = {
+      direction: "TD",
+      nodes: [
+        { id: "A", label: "Node A", shape: "rect", position: { x: 0, y: 0 } },
+      ],
+      edges: [],
+      subgraphs: [{ id: "Outer", label: "Outer", nodeIds: ["A"], hasExplicitId: true }],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain("subgraph Outer");
+    expect(output).not.toContain("[Outer]");
+  });
+
   it("serializes nested subgraphs with correct nesting", () => {
     const diagram: FlowDiagram = {
       direction: "TD",
