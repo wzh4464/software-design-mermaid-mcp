@@ -29,19 +29,16 @@ function serializeSubgraphHeader(sg: Subgraph): string {
   return `subgraph ${sg.id} [${sg.label}]`;
 }
 
-function collectAllSubgraphNodeIds(subgraphs: Subgraph[]): Set<string> {
-  const ids = new Set<string>();
+function collectAllSubgraphNodeIds(subgraphs: Subgraph[], acc: Set<string> = new Set<string>()): Set<string> {
   for (const sg of subgraphs) {
     for (const nodeId of sg.nodeIds) {
-      ids.add(nodeId);
+      acc.add(nodeId);
     }
     if (sg.children) {
-      for (const id of collectAllSubgraphNodeIds(sg.children)) {
-        ids.add(id);
-      }
+      collectAllSubgraphNodeIds(sg.children, acc);
     }
   }
-  return ids;
+  return acc;
 }
 
 function emitSubgraph(sg: Subgraph, nodeById: Map<string, FlowNode>, lines: string[], indent: string): void {

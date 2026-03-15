@@ -215,7 +215,7 @@ function EditorInner() {
   const handleAutoLayout = useCallback(() => {
     record(nodes, edges);
     const subgraphMap = buildSubgraphsFromNodes(nodes);
-    const subgraphs = Array.from(subgraphMap.values()).filter((sg) => sg.nodeIds.length > 0);
+    const subgraphs = Array.from(subgraphMap.values());
     const regularNodes = nodes.filter((n) => n.type !== "subgraphGroup");
     const laidOut = applyDagreLayout(regularNodes, edges, direction, subgraphs.length > 0 ? subgraphs : undefined);
     setNodes(laidOut);

@@ -35,6 +35,9 @@ function SubgraphNode({ data }: NodeProps) {
         }}
       >
         <button
+          type="button"
+          aria-label="Toggle subgraph"
+          aria-expanded={!collapsed}
           onClick={(e) => {
             e.stopPropagation();
             setCollapsed((v) => !v);
