@@ -3,3 +3,4 @@ dist/server/
 shared/dist/
 .superpowers/
 *.tsbuildinfo
+dist/
