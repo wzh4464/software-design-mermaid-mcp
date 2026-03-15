@@ -29,10 +29,10 @@ export default function Toolbar({ direction, onDirectionChange, onTogglePreview,
         id,
         type: "flowchart",
         position: { x: 200 + Math.random() * 100, y: 200 + Math.random() * 100 },
-        data: { label: `New ${shape}`, shape },
+        data: { label: `New ${shape}`, shape, direction },
       });
     },
-    [addNodes]
+    [addNodes, direction]
   );
 
   const deleteSelected = useCallback(() => {
