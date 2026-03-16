@@ -110,7 +110,7 @@ function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): Fl
     };
   });
 
-  const subgraphs = Array.from(subgraphMap.values()).filter((sg) => sg.nodeIds.length > 0);
+  const subgraphs = Array.from(subgraphMap.values());
   return { direction, nodes: flowNodes, edges: flowEdges, ...(subgraphs.length > 0 ? { subgraphs } : {}) };
 }
 
