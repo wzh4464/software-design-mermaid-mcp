@@ -26,7 +26,7 @@ export interface FlowEdge {
  *  - Editor (`editor/src/App.tsx` `buildSubgraphsFromNodes`): three-pass
  *    reconstruction from ReactFlow `parentId` relationships
  *
- * When `hasExplicitId` is false, `id` must equal `label.replace(/\s+/g, "_")`.
+ * When `hasExplicitId` is false, `id` must equal `normalizeSubgraphLabel(label)`.
  * The serializer relies on this invariant for round-trip correctness.
  */
 export interface Subgraph {
@@ -35,6 +35,15 @@ export interface Subgraph {
   nodeIds: string[];
   children?: Subgraph[];
   hasExplicitId?: boolean;
+}
+
+/**
+ * Normalizes a subgraph label into an ID by replacing whitespace runs with underscores.
+ * Used by both the parser and serializer to maintain round-trip correctness for
+ * label-only subgraphs (where `hasExplicitId` is false).
+ */
+export function normalizeSubgraphLabel(label: string): string {
+  return label.replace(/\s+/g, "_");
 }
 
 export interface FlowDiagram {

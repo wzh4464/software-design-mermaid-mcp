@@ -1,3 +1,4 @@
+import { normalizeSubgraphLabel } from "./types.js";
 import type { FlowDiagram, FlowNode, FlowEdge, Subgraph, Direction, NodeShape, EdgeType } from "./types.js";
 
 const DIRECTION_REGEX = /^(?:graph|flowchart)\s+(TD|LR|BT|RL)/;
@@ -122,7 +123,7 @@ export function parseMermaid(code: string): FlowDiagram {
     const subgraphLabelOnly = line.match(/^subgraph\s+(.+)$/);
     if (subgraphLabelOnly && !subgraphMatch) {
       const label = subgraphLabelOnly[1].trim();
-      const id = label.replace(/\s+/g, "_");
+      const id = normalizeSubgraphLabel(label);
       subgraphStack.push({ id, label, nodeIds: [], hasExplicitId: false });
       continue;
     }

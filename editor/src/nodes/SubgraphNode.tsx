@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { type MouseEvent, memo, useCallback } from "react";
 import { type NodeProps, useReactFlow } from "@xyflow/react";
 
 function SubgraphNode({ id, data }: NodeProps) {
@@ -7,7 +7,7 @@ function SubgraphNode({ id, data }: NodeProps) {
   const { setNodes } = useReactFlow();
 
   const toggleCollapsed = useCallback(
-    (e: React.MouseEvent) => {
+    (e: MouseEvent) => {
       e.stopPropagation();
       setNodes((nds) =>
         nds.map((n) =>

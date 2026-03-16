@@ -1,3 +1,4 @@
+import { normalizeSubgraphLabel } from "./types.js";
 import type { FlowDiagram, FlowNode, FlowEdge, Subgraph, NodeShape } from "./types.js";
 
 const SHAPE_WRAPPERS: Record<NodeShape, [string, string]> = {
@@ -24,7 +25,7 @@ function serializeSubgraphHeader(sg: Subgraph): string {
     // When there's no explicit id, `id` must be the normalized form of `label`
     // (spaces replaced with underscores). If this invariant is violated, fall
     // through to explicit-id format to preserve both fields during round-trips.
-    const normalizedId = sg.label.replace(/\s+/g, "_");
+    const normalizedId = normalizeSubgraphLabel(sg.label);
     if (sg.id !== normalizedId) {
       console.warn(
         `serializeSubgraphHeader: hasExplicitId is false but id "${sg.id}" ` +

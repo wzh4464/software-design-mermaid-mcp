@@ -75,6 +75,12 @@ function buildSubgraphsFromNodes(nodes: Node[]): Map<string, Subgraph> {
   // Pass 3: nest subgraphGroup nodes that have a parentId pointing to another subgraphGroup
   for (const n of nodes) {
     if (n.type === "subgraphGroup" && n.parentId && subgraphMap.has(n.parentId)) {
+      if (n.parentId === n.id) {
+        console.warn(
+          `buildSubgraphsFromNodes: subgraph "${n.id}" has itself as parentId; skipping`,
+        );
+        continue;
+      }
       const child = subgraphMap.get(n.id)!;
       const parent = subgraphMap.get(n.parentId)!;
       if (!parent.children) parent.children = [];
