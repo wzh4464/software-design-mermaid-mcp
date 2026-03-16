@@ -26,6 +26,11 @@ function serializeSubgraphHeader(sg: Subgraph): string {
     // through to explicit-id format to preserve both fields during round-trips.
     const normalizedId = sg.label.replace(/\s+/g, "_");
     if (sg.id !== normalizedId) {
+      console.warn(
+        `serializeSubgraphHeader: hasExplicitId is false but id "${sg.id}" ` +
+          `does not match normalized label "${normalizedId}"; ` +
+          `falling back to explicit-id format`,
+      );
       return `subgraph ${sg.id} [${sg.label}]`;
     }
     return `subgraph ${sg.label}`;
