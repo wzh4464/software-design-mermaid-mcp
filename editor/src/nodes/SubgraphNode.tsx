@@ -12,12 +12,12 @@ function SubgraphNode({ id, data }: NodeProps) {
       setNodes((nds) =>
         nds.map((n) =>
           n.id === id
-            ? { ...n, data: { ...n.data, collapsed: !collapsed } }
+            ? { ...n, data: { ...n.data, collapsed: !(n.data as { collapsed?: boolean }).collapsed } }
             : n,
         ),
       );
     },
-    [id, collapsed, setNodes],
+    [id, setNodes],
   );
   return (
     <div
