@@ -17,6 +17,18 @@ export interface FlowEdge {
   type: EdgeType;
 }
 
+/**
+ * Represents a Mermaid subgraph, possibly with nested children.
+ *
+ * **Nesting contract**: `children` forms a tree of nested subgraphs.
+ * Two codepaths produce this shape and must stay aligned:
+ *  - Parser (`shared/src/parser.ts`): stack-based nesting during parse
+ *  - Editor (`editor/src/App.tsx` `buildSubgraphsFromNodes`): three-pass
+ *    reconstruction from ReactFlow `parentId` relationships
+ *
+ * When `hasExplicitId` is false, `id` must equal `label.replace(/\s+/g, "_")`.
+ * The serializer relies on this invariant for round-trip correctness.
+ */
 export interface Subgraph {
   id: string;
   label: string;

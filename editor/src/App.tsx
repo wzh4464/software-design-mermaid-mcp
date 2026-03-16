@@ -50,7 +50,8 @@ function flowToReactFlow(diagram: FlowDiagram, direction: Direction): { nodes: N
  *
  * NOTE: The nesting semantics here (parentId → children) must stay aligned with the
  * parser's Subgraph.children structure so that round-tripping through parseMermaid →
- * editor → toMermaid produces consistent results.
+ * editor → toMermaid produces consistent results. See the `Subgraph` interface
+ * (shared/src/types.ts) for the nesting contract both codepaths must satisfy.
  */
 function buildSubgraphsFromNodes(nodes: Node[]): Map<string, Subgraph> {
   const subgraphMap = new Map<string, Subgraph>();

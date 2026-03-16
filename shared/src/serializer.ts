@@ -21,6 +21,13 @@ function serializeNode(node: FlowNode): string {
 
 function serializeSubgraphHeader(sg: Subgraph): string {
   if (sg.hasExplicitId === false) {
+    // When there's no explicit id, `id` must be the normalized form of `label`
+    // (spaces replaced with underscores). If this invariant is violated, fall
+    // through to explicit-id format to preserve both fields during round-trips.
+    const normalizedId = sg.label.replace(/\s+/g, "_");
+    if (sg.id !== normalizedId) {
+      return `subgraph ${sg.id} [${sg.label}]`;
+    }
     return `subgraph ${sg.label}`;
   }
   if (sg.id === sg.label) {
