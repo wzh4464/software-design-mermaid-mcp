@@ -45,29 +45,64 @@ function flowToReactFlow(diagram: FlowDiagram, direction: Direction): { nodes: N
   return { nodes: laidOutNodes, edges };
 }
 
-function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): FlowDiagram {
-  // Reconstruct subgraphs from parentId relationships
+/**
+ * Three-pass approach: collect subgraphGroup nodes, attach regular children, then nest subgraphs.
+ *
+ * NOTE: The nesting semantics here (parentId → children) must stay aligned with the
+ * parser's Subgraph.children structure so that round-tripping through parseMermaid →
+ * editor → toMermaid produces consistent results. See the `Subgraph` interface
+ * (shared/src/types.ts) for the nesting contract both codepaths must satisfy.
+ */
+function buildSubgraphsFromNodes(nodes: Node[]): Map<string, Subgraph> {
   const subgraphMap = new Map<string, Subgraph>();
-  const flowNodes: FlowNode[] = [];
-
+  // Pass 1: collect all subgraphGroup nodes
   for (const n of nodes) {
     if (n.type === "subgraphGroup") {
       subgraphMap.set(n.id, {
         id: n.id,
         label: (n.data as { label: string }).label,
         nodeIds: [],
+        hasExplicitId: true,
       });
-      continue;
     }
+  }
+  // Pass 2: attach non-subgraphGroup children by parentId
+  for (const n of nodes) {
+    if (n.type !== "subgraphGroup" && n.parentId && subgraphMap.has(n.parentId)) {
+      subgraphMap.get(n.parentId)!.nodeIds.push(n.id);
+    }
+  }
+  // Pass 3: nest subgraphGroup nodes that have a parentId pointing to another subgraphGroup
+  for (const n of nodes) {
+    if (n.type === "subgraphGroup" && n.parentId && subgraphMap.has(n.parentId)) {
+      if (n.parentId === n.id) {
+        console.warn(
+          `buildSubgraphsFromNodes: subgraph "${n.id}" has itself as parentId; skipping`,
+        );
+        continue;
+      }
+      const child = subgraphMap.get(n.id)!;
+      const parent = subgraphMap.get(n.parentId)!;
+      if (!parent.children) parent.children = [];
+      parent.children.push(child);
+      subgraphMap.delete(n.id);
+    }
+  }
+  return subgraphMap;
+}
+
+function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): FlowDiagram {
+  const subgraphMap = buildSubgraphsFromNodes(nodes);
+  const flowNodes: FlowNode[] = [];
+
+  for (const n of nodes) {
+    if (n.type === "subgraphGroup") continue;
     flowNodes.push({
       id: n.id,
       label: (n.data as { label: string }).label,
       shape: (n.data as { shape: string }).shape as FlowNode["shape"],
       position: n.position,
     });
-    if (n.parentId && subgraphMap.has(n.parentId)) {
-      subgraphMap.get(n.parentId)!.nodeIds.push(n.id);
-    }
   }
 
   const flowEdges: FlowEdge[] = edges.map((e) => {
@@ -81,7 +116,7 @@ function reactFlowToFlow(nodes: Node[], edges: Edge[], direction: Direction): Fl
     };
   });
 
-  const subgraphs = Array.from(subgraphMap.values()).filter((sg) => sg.nodeIds.length > 0);
+  const subgraphs = Array.from(subgraphMap.values());
   return { direction, nodes: flowNodes, edges: flowEdges, ...(subgraphs.length > 0 ? { subgraphs } : {}) };
 }
 
@@ -202,8 +237,10 @@ function EditorInner() {
 
   const handleAutoLayout = useCallback(() => {
     record(nodes, edges);
+    const subgraphMap = buildSubgraphsFromNodes(nodes);
+    const subgraphs = Array.from(subgraphMap.values());
     const regularNodes = nodes.filter((n) => n.type !== "subgraphGroup");
-    const laidOut = applyDagreLayout(regularNodes, edges, direction);
+    const laidOut = applyDagreLayout(regularNodes, edges, direction, subgraphs.length > 0 ? subgraphs : undefined);
     setNodes(laidOut);
   }, [nodes, edges, direction, record]);
 

@@ -1,3 +1,4 @@
+import { normalizeSubgraphLabel } from "./types.js";
 import type { FlowDiagram, FlowNode, FlowEdge, Subgraph, Direction, NodeShape, EdgeType } from "./types.js";
 
 const DIRECTION_REGEX = /^(?:graph|flowchart)\s+(TD|LR|BT|RL)/;
@@ -95,11 +96,18 @@ export function parseMermaid(code: string): FlowDiagram {
       continue;
     }
 
-    // Subgraph parsing
-    if (line === "end" && subgraphStack.length > 0) {
-      const completed = subgraphStack.pop()!;
-      if (completed.nodeIds.length > 0) {
-        subgraphs.push(completed);
+    // Always treat `end` as reserved — skip even when no active subgraph
+    if (line === "end") {
+      if (subgraphStack.length > 0) {
+        const completed = subgraphStack.pop()!;
+        // Nest under parent subgraph if one exists on the stack
+        if (subgraphStack.length > 0) {
+          const parent = subgraphStack[subgraphStack.length - 1];
+          if (!parent.children) parent.children = [];
+          parent.children.push(completed);
+        } else {
+          subgraphs.push(completed);
+        }
       }
       continue;
     }
@@ -108,15 +116,15 @@ export function parseMermaid(code: string): FlowDiagram {
     if (subgraphMatch) {
       const id = subgraphMatch[1];
       const label = subgraphMatch[2] || id;
-      subgraphStack.push({ id, label, nodeIds: [] });
+      subgraphStack.push({ id, label, nodeIds: [], hasExplicitId: true });
       continue;
     }
     // Also handle: subgraph Label (no brackets, label becomes id)
     const subgraphLabelOnly = line.match(/^subgraph\s+(.+)$/);
     if (subgraphLabelOnly && !subgraphMatch) {
       const label = subgraphLabelOnly[1].trim();
-      const id = label.replace(/\s+/g, "_");
-      subgraphStack.push({ id, label, nodeIds: [] });
+      const id = normalizeSubgraphLabel(label);
+      subgraphStack.push({ id, label, nodeIds: [], hasExplicitId: false });
       continue;
     }
 

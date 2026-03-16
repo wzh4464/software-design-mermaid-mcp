@@ -132,7 +132,7 @@ describe("parseMermaid", () => {
     expect(result.subgraphs![0].nodeIds).toEqual(["A", "B"]);
   });
 
-  it("parses nested subgraphs", () => {
+  it("parses nested subgraphs with children", () => {
     const input = `graph TD
   subgraph outer [Outer]
     subgraph inner [Inner]
@@ -141,11 +141,52 @@ describe("parseMermaid", () => {
     B[Node B]
   end`;
     const result = parseMermaid(input);
+    // Only 1 top-level subgraph (outer); inner is nested as a child
+    expect(result.subgraphs).toHaveLength(1);
+    const outer = result.subgraphs![0];
+    expect(outer.id).toBe("outer");
+    expect(outer.nodeIds).toContain("B");
+    expect(outer.children).toHaveLength(1);
+    const inner = outer.children![0];
+    expect(inner.id).toBe("inner");
+    expect(inner.nodeIds).toContain("A");
+  });
+
+  it("does not create a node for bare 'end' line outside subgraph", () => {
+    const input = `graph TD
+  A[Start] --> B[End Node]
+  end`;
+    const result = parseMermaid(input);
+    const endNode = result.nodes.find((n) => n.id === "end");
+    expect(endNode).toBeUndefined();
+    expect(result.subgraphs ?? []).toHaveLength(0);
+  });
+
+  it("preserves empty subgraphs", () => {
+    const input = `graph TD
+  subgraph empty [Empty Group]
+  end
+  A[Node A]`;
+    const result = parseMermaid(input);
+    expect(result.subgraphs).toHaveLength(1);
+    expect(result.subgraphs![0]).toMatchObject({ id: "empty", label: "Empty Group" });
+    expect(result.subgraphs![0].nodeIds).toEqual([]);
+  });
+
+  it("sets hasExplicitId correctly", () => {
+    const input = `graph TD
+  subgraph sg1 [My Group]
+    A[Node A]
+  end
+  subgraph Feature Engineering
+    B[Node B]
+  end`;
+    const result = parseMermaid(input);
     expect(result.subgraphs).toHaveLength(2);
-    const inner = result.subgraphs!.find((sg) => sg.id === "inner");
-    const outer = result.subgraphs!.find((sg) => sg.id === "outer");
-    expect(inner!.nodeIds).toContain("A");
-    expect(outer!.nodeIds).toContain("B");
+    const sg1 = result.subgraphs!.find((sg) => sg.id === "sg1");
+    const fe = result.subgraphs!.find((sg) => sg.id === "Feature_Engineering");
+    expect(sg1!.hasExplicitId).toBe(true);
+    expect(fe!.hasExplicitId).toBe(false);
   });
 
   it("tracks nodes from edges inside subgraphs", () => {
@@ -162,5 +203,23 @@ describe("parseMermaid", () => {
   it("returns no subgraphs when none present", () => {
     const result = parseMermaid("graph TD\n  A[Start] --> B[End]");
     expect(result.subgraphs).toBeUndefined();
+  });
+
+  it("parses nested subgraph where inner uses label-only syntax", () => {
+    const input = `graph TD
+subgraph outer [Outer]
+  subgraph Inner Label Only
+    A[Node A]
+  end
+end`;
+    const result = parseMermaid(input);
+    expect(result.subgraphs).toHaveLength(1);
+    const outer = result.subgraphs![0];
+    expect(outer.id).toBe("outer");
+    expect(outer.children).toHaveLength(1);
+    const inner = outer.children![0];
+    expect(inner.hasExplicitId).toBe(false);
+    expect(inner.id).toBe("Inner_Label_Only");
+    expect(inner.label).toBe("Inner Label Only");
   });
 });

@@ -12,7 +12,7 @@ const DIRECTION_MAP: Record<Direction, string> = {
 function estimateNodeSize(label: string, shape: string): { width: number; height: number } {
   const lines = label.split(/<br\s*\/?>/gi);
   const maxLineLen = Math.max(...lines.map((l) => l.length));
-  const width = Math.max(shape === "diamond" ? 100 : 100, maxLineLen * 8 + 40);
+  const width = Math.max(100, maxLineLen * 8 + 40);
   const baseHeight = shape === "diamond" || shape === "circle" ? width : 44;
   const height = baseHeight + Math.max(0, lines.length - 1) * 20;
   return { width, height };

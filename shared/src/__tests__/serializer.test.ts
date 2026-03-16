@@ -127,7 +127,7 @@ describe("toMermaid", () => {
     expect(output).toContain("B -->|No| D");
   });
 
-  it("serializes subgraphs", () => {
+  it("serializes subgraphs with member nodes only between subgraph/end lines", () => {
     const diagram: FlowDiagram = {
       direction: "TD",
       nodes: [
@@ -139,14 +139,97 @@ describe("toMermaid", () => {
       subgraphs: [{ id: "sg1", label: "My Group", nodeIds: ["A", "B"] }],
     };
     const output = toMermaid(diagram);
-    expect(output).toContain("subgraph sg1 [My Group]");
-    expect(output).toContain("end");
-    // C should be a top-level node, not inside the subgraph
     const lines = output.split("\n");
-    const cLine = lines.find((l) => l.includes("C[Outside]"));
-    const sgLine = lines.findIndex((l) => l.includes("subgraph"));
-    const cIdx = lines.indexOf(cLine!);
-    expect(cIdx).toBeLessThan(sgLine);
+
+    // Find subgraph block boundaries
+    const sgStart = lines.findIndex((l) => l.includes("subgraph sg1"));
+    const sgEnd = lines.findIndex((l, i) => i > sgStart && l.trim() === "end");
+    expect(sgStart).toBeGreaterThan(-1);
+    expect(sgEnd).toBeGreaterThan(sgStart);
+
+    // Member nodes A and B must appear inside the subgraph block
+    const aIdx = lines.findIndex((l) => l.includes("A[Start]"));
+    const bIdx = lines.findIndex((l) => l.includes("B[Process]"));
+    expect(aIdx).toBeGreaterThan(sgStart);
+    expect(aIdx).toBeLessThan(sgEnd);
+    expect(bIdx).toBeGreaterThan(sgStart);
+    expect(bIdx).toBeLessThan(sgEnd);
+
+    // Member nodes must NOT appear as top-level nodes (outside the subgraph block)
+    const topLevelLines = lines.filter((_, i) => i < sgStart || i > sgEnd);
+    expect(topLevelLines.some((l) => l.includes("A[Start]"))).toBe(false);
+    expect(topLevelLines.some((l) => l.includes("B[Process]"))).toBe(false);
+
+    // C should be a top-level node, not inside the subgraph
+    const cIdx = lines.findIndex((l) => l.includes("C[Outside]"));
+    expect(cIdx).toBeLessThan(sgStart);
+  });
+
+  it("serializes label-only subgraph without bracket syntax", () => {
+    const diagram: FlowDiagram = {
+      direction: "TD",
+      nodes: [
+        { id: "A", label: "Node A", shape: "rect", position: { x: 0, y: 0 } },
+      ],
+      edges: [],
+      subgraphs: [{ id: "Feature_Engineering", label: "Feature Engineering", nodeIds: ["A"], hasExplicitId: false }],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain("subgraph Feature Engineering");
+    expect(output).not.toContain("[Feature Engineering]");
+  });
+
+  it("serializes subgraph with id === label and hasExplicitId without brackets", () => {
+    const diagram: FlowDiagram = {
+      direction: "TD",
+      nodes: [
+        { id: "A", label: "Node A", shape: "rect", position: { x: 0, y: 0 } },
+      ],
+      edges: [],
+      subgraphs: [{ id: "Outer", label: "Outer", nodeIds: ["A"], hasExplicitId: true }],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain("subgraph Outer");
+    expect(output).not.toContain("[Outer]");
+  });
+
+  it("serializes nested subgraphs with correct nesting", () => {
+    const diagram: FlowDiagram = {
+      direction: "TD",
+      nodes: [
+        { id: "A", label: "Inner Node", shape: "rect", position: { x: 0, y: 0 } },
+        { id: "B", label: "Outer Node", shape: "rect", position: { x: 0, y: 100 } },
+      ],
+      edges: [],
+      subgraphs: [{
+        id: "outer", label: "Outer", nodeIds: ["B"], hasExplicitId: true,
+        children: [{ id: "inner", label: "Inner", nodeIds: ["A"], hasExplicitId: true }],
+      }],
+    };
+    const output = toMermaid(diagram);
+    const lines = output.split("\n");
+
+    const outerStart = lines.findIndex((l) => l.includes("subgraph outer"));
+    const innerStart = lines.findIndex((l) => l.includes("subgraph inner"));
+    const innerEnd = lines.findIndex((l, i) => i > innerStart && l.trim() === "end");
+    const outerEnd = lines.findIndex((l, i) => i > innerEnd && l.trim() === "end");
+
+    // Inner subgraph is nested inside outer
+    expect(innerStart).toBeGreaterThan(outerStart);
+    expect(innerEnd).toBeLessThan(outerEnd);
+
+    // A is inside inner block, B is inside outer block but outside inner
+    const aIdx = lines.findIndex((l) => l.includes("A[Inner Node]"));
+    const bIdx = lines.findIndex((l) => l.includes("B[Outer Node]"));
+    expect(aIdx).toBeGreaterThan(innerStart);
+    expect(aIdx).toBeLessThan(innerEnd);
+    expect(bIdx).toBeGreaterThan(innerEnd);
+    expect(bIdx).toBeLessThan(outerEnd);
+
+    // Member nodes must NOT appear as top-level nodes (before the outer subgraph block)
+    const topLevelLines = lines.filter((_, i) => i < outerStart);
+    expect(topLevelLines.some((l) => l.includes("A[Inner Node]"))).toBe(false);
+    expect(topLevelLines.some((l) => l.includes("B[Outer Node]"))).toBe(false);
   });
 
   it("round-trips subgraphs through parse and serialize", async () => {
