@@ -2,5 +2,6 @@ node_modules/
 dist/server/
 shared/dist/
 .superpowers/
+.claude/
 *.tsbuildinfo
 dist/
