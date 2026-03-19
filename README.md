@@ -20,7 +20,7 @@ Turn Claude into a visual software design partner with a drag-and-drop Mermaid e
 
 <div align="center">
 
-![Visual diagram editor showing a system architecture flowchart with drag-and-drop nodes, subgraphs, and live Mermaid preview](docs/editor-demo.png)
+![Visual diagram editor showing a microservice architecture with drag-and-drop nodes, subgraphs, edge labels, and live Mermaid preview](docs/demo-hero.png)
 
 *Claude generates the diagram, you refine it visually — drag nodes, edit labels, draw connections, then submit back for the next iteration*
 
@@ -155,6 +155,13 @@ Refer to your client's documentation for the exact config file location.
 | 🔄 | **Multi-Round Iteration** | Edit → Submit → Claude refines → Edit again. **True visual collaboration.** |
 | ⏪ | **Undo / Redo** | Full history with Ctrl+Z / Ctrl+Y |
 | ⚙️ | **Zero Config** | Auto-finds an open port and launches your browser |
+
+<details>
+<summary><b>See: Horizontal layout with subgraphs</b></summary>
+
+![Horizontal LR layout showing load balancer, backend cluster, and storage subgraphs](docs/demo-subgraphs.png)
+
+</details>
 
 ---
 
